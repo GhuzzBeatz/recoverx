@@ -1,0 +1,197 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/util.js"></script>
+</head><body>
+<div class="page-content">
+
+<div class="page-hdr-row page-hdr">
+  <div>
+    <h1>⚡ Scan <span>Rápido</span></h1>
+    <p>Recupera arquivos da Lixeira, temp e arquivos recentes excluídos</p>
+  </div>
+</div>
+
+<!-- SELEÇÃO DE DRIVE -->
+<div class="card">
+  <div class="card-header"><span class="card-title">💾 Selecione o Drive</span></div>
+  <div class="card-body" style="padding:16px">
+    <div class="drives-row" id="drivesRow">
+      <div style="text-align:center;color:var(--muted);padding:24px;width:100%">⏳ Carregando drives...</div>
+    </div>
+  </div>
+</div>
+
+<!-- OPÇÕES -->
+<div class="card">
+  <div class="card-header"><span class="card-title">⚙️ O que escanear</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px">
+        <input type="checkbox" id="chkLixeira" checked style="width:16px;height:16px;accent-color:var(--cyan)">
+        <span style="font-size:13px;color:var(--fg)">🗑️ Lixeira</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px">
+        <input type="checkbox" id="chkTemp" checked style="width:16px;height:16px;accent-color:var(--cyan)">
+        <span style="font-size:13px;color:var(--fg)">🗂️ Arquivos Temp</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px">
+        <input type="checkbox" id="chkCache" checked style="width:16px;height:16px;accent-color:var(--cyan)">
+        <span style="font-size:13px;color:var(--fg)">🌐 Cache do Sistema</span>
+      </label>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button class="btn btn-primary btn-lg" id="btnScan" onclick="iniciarScan()" style="flex:1;justify-content:center">
+        ⚡ Iniciar Scan Rápido
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- PROGRESSO -->
+<div id="boxProgresso" style="display:none">
+  <div class="card card-glow" style="border-color:var(--cyan-bdr)">
+    <div class="card-body">
+      <div class="scan-pulse">
+        <div class="scan-ring"></div>
+        <div>
+          <div class="scan-texto" id="scanTexto">Iniciando scan...</div>
+          <div class="scan-sub" id="scanSub">Aguarde</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar" id="scanBar" style="width:30%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTADO RESUMO -->
+<div id="boxResultado" style="display:none">
+  <div class="card" style="border-color:var(--green);border-color:rgba(0,229,160,.4)">
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
+        <div style="text-align:center;background:var(--cyan-bg);border:1px solid var(--cyan-bdr);border-radius:12px;padding:16px">
+          <div style="font-size:32px;font-weight:900;color:var(--cyan)" id="resTotal">0</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px">Arquivos encontrados</div>
+        </div>
+        <div style="text-align:center;background:var(--green-bg);border:1px solid rgba(0,229,160,.2);border-radius:12px;padding:16px">
+          <div style="font-size:32px;font-weight:900;color:var(--green)" id="resTamanho">0 B</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px">Tamanho total</div>
+        </div>
+        <div style="text-align:center;background:var(--purple-bg);border:1px solid rgba(168,85,247,.2);border-radius:12px;padding:16px">
+          <div style="font-size:32px;font-weight:900;color:var(--purple)" id="resTipos">0</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px">Tipos diferentes</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="verResultados()" style="flex:1;justify-content:center">
+          📂 Ver e Recuperar Arquivos
+        </button>
+        <button class="btn btn-ghost" onclick="novaScan()">🔄 Nova Scan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="aviso av-ok" id="avisoOk"></div>
+<div class="aviso av-err" id="avisoErro"></div>
+</div>
+
+<script>
+const { ipcRenderer } = require('electron')
+const fs   = require('fs')
+const path = require('path')
+const dataDir = process.argv.find(a=>a.startsWith('--data-dir=')).replace('--data-dir=','')
+let driveAtivo = null
+
+async function carregarDrives() {
+  const drives = await ipcRenderer.invoke('drives:listar')
+  const row = document.getElementById('drivesRow')
+  if (!drives.length) { row.innerHTML = '<div class="empty">Nenhum drive detectado</div>'; return }
+  driveAtivo = drives[0].letra
+  row.innerHTML = drives.map(d => `
+    <div class="drive-card ${d.letra === driveAtivo ? 'selected' : ''}" onclick="selecionarDrive('${d.letra}',this)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <div class="drive-letra">${d.letra}</div>
+        <span class="badge b-cyan">${d.pct}% usado</span>
+      </div>
+      <div class="drive-info">Livre: <strong style="color:var(--green)">${fmtBytes(d.livre)}</strong></div>
+      <div class="drive-bar-wrap"><div class="drive-bar" style="width:${d.pct}%"></div></div>
+    </div>`).join('')
+}
+
+function selecionarDrive(letra, el) {
+  driveAtivo = letra
+  document.querySelectorAll('.drive-card').forEach(c => c.classList.remove('selected'))
+  el.classList.add('selected')
+}
+
+async function iniciarScan() {
+  if (!driveAtivo) { avisoModal('Selecione um drive primeiro.'); return }
+  const incluirLixeira = document.getElementById('chkLixeira').checked
+  const incluirTemp = document.getElementById('chkTemp').checked
+  const incluirCache = document.getElementById('chkCache').checked
+  if (!incluirLixeira && !incluirTemp && !incluirCache) {
+    avisoModal('Selecione pelo menos uma origem para o scan rapido.')
+    return
+  }
+  document.getElementById('btnScan').disabled = true
+  document.getElementById('boxProgresso').style.display = 'block'
+  document.getElementById('boxResultado').style.display = 'none'
+
+  const resultados = []
+
+  if (incluirLixeira) {
+    document.getElementById('scanTexto').textContent = '🗑️ Escaneando Lixeira...'
+    document.getElementById('scanSub').textContent = 'Drive ' + driveAtivo
+    document.getElementById('scanBar').style.width = '30%'
+    const res = await ipcRenderer.invoke('scan:lixeira', driveAtivo)
+    resultados.push(...res)
+  }
+
+  if (incluirTemp || incluirCache) {
+    document.getElementById('scanTexto').textContent = '🗂️ Escaneando Temp e Cache...'
+    document.getElementById('scanBar').style.width = '70%'
+    const res = await ipcRenderer.invoke('scan:temp', { incluirTemp, incluirCache })
+    resultados.push(...res)
+  }
+
+  document.getElementById('scanBar').style.width = '100%'
+  document.getElementById('scanTexto').textContent = '✅ Scan concluído!'
+  document.getElementById('scanSub').textContent = resultados.length + ' arquivos encontrados'
+
+  // Salva resultados
+  fs.writeFileSync(path.join(dataDir,'scan_atual.json'), JSON.stringify(resultados,null,2))
+  await ipcRenderer.invoke('dados:salvar', 'scan_meta', {
+    tipoScan: 'rapido',
+    driveOrigem: driveAtivo,
+    incluirLixeira,
+    incluirTemp,
+    incluirCache,
+    totalEncontrado: resultados.length,
+    atualizadoEm: new Date().toISOString()
+  })
+
+  setTimeout(() => {
+    document.getElementById('boxProgresso').style.display = 'none'
+    document.getElementById('boxResultado').style.display = 'block'
+    document.getElementById('resTotal').textContent = resultados.length
+    document.getElementById('resTamanho').textContent = fmtBytes(resultados.reduce((s,r)=>s+(r.tamanho||0),0))
+    const tipos = new Set(resultados.map(r=>r.tipo)).size
+    document.getElementById('resTipos').textContent = tipos
+    document.getElementById('btnScan').disabled = false
+  }, 800)
+}
+
+function verResultados() {
+  window.parent.ir('pages/resultados.html', null)
+}
+
+function novaScan() {
+  document.getElementById('boxResultado').style.display = 'none'
+  document.getElementById('btnScan').disabled = false
+}
+
+carregarDrives()
+</script>
+</body></html>

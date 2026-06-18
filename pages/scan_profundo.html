@@ -1,0 +1,454 @@
+﻿<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/util.js"></script>
+</head><body>
+<div class="page-content">
+
+<div class="page-hdr">
+  <h1>Scan <span>Profundo</span></h1>
+  <p>Recuperacao avancada usando PhotoRec e Windows File Recovery para buscar mais arquivos no disco.</p>
+</div>
+
+<div id="avisoMotores" class="card" style="display:none;border-color:rgba(255,165,2,.3)">
+  <div class="card-body" style="background:var(--orange-bg);border-radius:12px;padding:20px">
+    <div style="font-size:16px;font-weight:800;color:var(--orange);margin-bottom:10px">Nenhum motor de scan profundo encontrado</div>
+    <div style="font-size:13px;color:var(--fg2);line-height:1.8">
+      Para usar esta area, instale ao menos um dos motores abaixo:<br><br>
+      <strong style="color:var(--fg)">PhotoRec</strong>: coloque <code style="color:var(--cyan)">photorec_win.exe</code> ou <code style="color:var(--cyan)">testdisk_win.exe</code> na pasta <code style="color:var(--cyan)">tools\</code> do app.<br>
+      <strong style="color:var(--fg)">Windows File Recovery</strong>: instale pela Microsoft Store no proprio Windows.<br><br>
+      Quando os dois estiverem disponiveis, o RecoverX libera o modo <strong style="color:var(--green)">Hibrido</strong>, que costuma achar mais arquivos.
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn-orange" onclick="require('electron').shell.openExternal('https://www.cgsecurity.org/wiki/TestDisk_Download')">Baixar PhotoRec</button>
+    </div>
+  </div>
+</div>
+
+<div id="boxConfig">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Motor de recuperacao</span></div>
+    <div class="card-body">
+      <div style="font-size:12px;color:var(--fg2);margin-bottom:14px;line-height:1.7">
+        O RecoverX pode usar um ou dois motores no scan profundo. Quando o modo <strong style="color:var(--green)">Hibrido</strong> estiver disponivel, ele combina os achados do Windows File Recovery com o PhotoRec.
+      </div>
+      <div id="motoresGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"></div>
+      <div id="motoresAjuda" style="font-size:11px;color:var(--muted);margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Drive que sera escaneado</span></div>
+      <div class="card-body" style="padding:14px">
+        <div class="drives-row" id="drivesRow" style="grid-template-columns:1fr 1fr"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Pasta para salvar os arquivos encontrados</span></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--fg2);margin-bottom:14px;line-height:1.7">
+          O <strong style="color:var(--fg)">drive de origem</strong> e o local que sera escaneado.<br>
+          Esta pasta serve apenas para <strong style="color:var(--fg)">salvar os arquivos encontrados</strong>.<br>
+          O RecoverX criara automaticamente uma subpasta exclusiva do scan dentro da pasta escolhida.
+        </p>
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:9px;padding:12px;margin-bottom:10px;min-height:42px;font-size:13px;color:var(--fg2)" id="destinoTexto">
+          Nenhuma pasta de salvamento selecionada
+        </div>
+        <div id="destinoAjuda" style="font-size:11px;color:var(--muted);margin-bottom:12px">
+          Escolha uma pasta em outro drive para evitar sobrescrita durante a recuperacao.
+        </div>
+        <button class="btn btn-ghost" onclick="escolherDestino()" style="width:100%;justify-content:center">
+          Escolher Pasta de Salvamento
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Tipos de arquivo para mostrar nos resultados</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm" onclick="marcarTodos()">Todos</button>
+        <button class="btn btn-ghost btn-sm" onclick="desmarcarTodos()">Nenhum</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="font-size:12px;color:var(--fg2);margin-bottom:12px;line-height:1.6">
+        O RecoverX mostra nos resultados apenas os tipos marcados abaixo. No modo Hibrido, o Windows File Recovery ja tenta focar nesses formatos antes da listagem final.
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px" id="gridTipos">
+        <label class="tipo-check" data-tipo="jpg"><input type="checkbox" checked> JPEG/JPG</label>
+        <label class="tipo-check" data-tipo="png"><input type="checkbox" checked> PNG</label>
+        <label class="tipo-check" data-tipo="pdf"><input type="checkbox" checked> PDF</label>
+        <label class="tipo-check" data-tipo="doc"><input type="checkbox" checked> DOC/DOCX</label>
+        <label class="tipo-check" data-tipo="xls"><input type="checkbox" checked> XLS/XLSX</label>
+        <label class="tipo-check" data-tipo="mp4"><input type="checkbox" checked> MP4/AVI</label>
+        <label class="tipo-check" data-tipo="mp3"><input type="checkbox" checked> MP3/WAV</label>
+        <label class="tipo-check" data-tipo="zip"><input type="checkbox" checked> ZIP/RAR</label>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-purple btn-lg" id="btnScanProf" onclick="iniciarScanProfundo()" style="width:100%;justify-content:center;margin-bottom:16px">
+    Iniciar Scan Profundo
+  </button>
+</div>
+
+<div id="boxScanAtivo" style="display:none">
+  <div class="card card-glow" style="border-color:rgba(168,85,247,.4)">
+    <div class="card-body">
+      <div class="scan-pulse">
+        <div class="scan-ring" style="border-top-color:var(--purple)"></div>
+        <div>
+          <div class="scan-texto" style="color:var(--purple)">Scan profundo em andamento...</div>
+          <div class="scan-sub" id="scanSubtexto">Vasculhando o disco. Esse processo pode levar varios minutos.</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bar" id="scanProfBar" style="background:linear-gradient(90deg,var(--purple),var(--cyan));width:0%;transition:width 3s"></div>
+      </div>
+      <div class="log-box" id="logScan" style="margin-top:14px;height:170px"></div>
+      <div style="display:flex;justify-content:center;margin-top:14px">
+        <button class="btn btn-danger" onclick="pararScan()">Parar Scan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="boxResultadoProf" style="display:none">
+  <div class="card" style="border-color:rgba(0,229,160,.4)">
+    <div class="card-body" style="text-align:center;padding:28px">
+      <div style="font-size:20px;font-weight:900;color:var(--green);margin-bottom:8px" id="tituloResultadoProf">Scan concluido</div>
+      <div style="font-size:14px;color:var(--fg2);margin-bottom:10px" id="resProftexto">-</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="resProfDetalhe"></div>
+      <div style="font-size:12px;color:var(--orange);margin-bottom:20px;display:none" id="resProfAvisos"></div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-primary" onclick="verResultadosProf()">Ver Arquivos Encontrados</button>
+        <button class="btn btn-ghost" onclick="abrirDestino()">Abrir Pasta do Scan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="aviso av-ok" id="avisoOk"></div>
+<div class="aviso av-err" id="avisoErro"></div>
+
+<style>
+.tipo-check {
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  padding:10px 12px; background:var(--bg2); border:1px solid var(--border2);
+  border-radius:9px; font-size:13px; color:var(--fg2); transition:all .15s;
+}
+.tipo-check:hover { border-color:var(--cyan-bdr); color:var(--fg) }
+.tipo-check input { accent-color:var(--purple); width:14px; height:14px }
+.motor-card {
+  background:var(--bg2); border:1px solid var(--border2); border-radius:12px; padding:14px;
+  cursor:pointer; transition:all .2s; min-height:122px; display:flex; flex-direction:column; gap:8px;
+}
+.motor-card:hover { border-color:var(--cyan-bdr); transform:translateY(-1px) }
+.motor-card.selected { border-color:var(--cyan); background:var(--cyan-bg); box-shadow:var(--glow) }
+.motor-card.disabled { opacity:.55; cursor:not-allowed; box-shadow:none }
+.motor-topo { display:flex; align-items:center; justify-content:space-between; gap:8px }
+.motor-nome { font-size:13px; font-weight:800; color:var(--fg) }
+.motor-desc { font-size:12px; color:var(--fg2); line-height:1.55 }
+</style>
+
+<script>
+const { ipcRenderer } = require('electron')
+const fs = require('fs')
+const path = require('path')
+const dataDir = process.argv.find(a => a.startsWith('--data-dir=')).replace('--data-dir=', '')
+
+let driveAtivo = null
+let destinoBase = null
+let destinoPastaScan = null
+let statusMotores = null
+let motorSelecionado = 'photorec'
+
+function extrairDriveDaPasta(pasta) {
+  const match = String(pasta || '').match(/^[A-Za-z]:/)
+  return match ? match[0].toUpperCase() : null
+}
+
+function obterTiposSelecionados() {
+  return [...document.querySelectorAll('.tipo-check input:checked')]
+    .map(c => c.closest('.tipo-check').dataset.tipo)
+}
+
+function extPermitida(ext, tiposSelecionados) {
+  const grupos = {
+    jpg: ['.jpg', '.jpeg', '.jpe'],
+    png: ['.png'],
+    pdf: ['.pdf'],
+    doc: ['.doc', '.docx', '.rtf', '.odt'],
+    xls: ['.xls', '.xlsx', '.csv', '.ods'],
+    mp4: ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm', '.m4v'],
+    mp3: ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a'],
+    zip: ['.zip', '.rar', '.7z', '.tar', '.gz', '.iso']
+  }
+  return tiposSelecionados.some(tipo => (grupos[tipo] || []).includes((ext || '').toLowerCase()))
+}
+
+function filtrarArquivosPorTipos(arquivos, tiposSelecionados) {
+  return arquivos.filter(arq => extPermitida(arq.ext, tiposSelecionados))
+}
+
+function nomeMotor(motor) {
+  return motor === 'winfr' ? 'Windows File Recovery' : (motor === 'photorec' ? 'PhotoRec' : motor)
+}
+
+function infoMotorDisponivel(motor) {
+  return statusMotores && statusMotores[motor] && statusMotores[motor].disponivel
+}
+
+function motorRecomendado() {
+  if (infoMotorDisponivel('photorec') && infoMotorDisponivel('winfr')) return 'hibrido'
+  if (infoMotorDisponivel('photorec')) return 'photorec'
+  if (infoMotorDisponivel('winfr')) return 'winfr'
+  return 'photorec'
+}
+
+function renderMotores() {
+  const grid = document.getElementById('motoresGrid')
+  const ajuda = document.getElementById('motoresAjuda')
+  const recomendacao = motorRecomendado()
+
+  const motores = [
+    {
+      id: 'photorec',
+      nome: 'PhotoRec',
+      desc: 'Varredura bruta por assinatura. Muito forte para formatacao, cartao SD e casos mais pesados.',
+      disponivel: infoMotorDisponivel('photorec'),
+      badge: infoMotorDisponivel('photorec') ? 'Disponivel' : 'Nao encontrado'
+    },
+    {
+      id: 'winfr',
+      nome: 'Windows File Recovery',
+      desc: 'Ajuda bastante em exclusao recente e cenarios NTFS. Precisa estar instalado neste Windows.',
+      disponivel: infoMotorDisponivel('winfr'),
+      badge: infoMotorDisponivel('winfr') ? 'Disponivel' : 'Opcional'
+    },
+    {
+      id: 'hibrido',
+      nome: 'Hibrido',
+      desc: 'Executa Windows File Recovery e depois PhotoRec, combinando os achados em uma unica pasta.',
+      disponivel: infoMotorDisponivel('photorec') && infoMotorDisponivel('winfr'),
+      badge: infoMotorDisponivel('photorec') && infoMotorDisponivel('winfr') ? 'Recomendado' : 'Requer os dois'
+    }
+  ]
+
+  if (!motores.some(m => m.disponivel)) {
+    document.getElementById('avisoMotores').style.display = 'block'
+    document.getElementById('boxConfig').style.display = 'none'
+    return
+  }
+
+  document.getElementById('avisoMotores').style.display = 'none'
+  document.getElementById('boxConfig').style.display = 'block'
+
+  if (!motores.find(m => m.id === motorSelecionado && m.disponivel)) {
+    motorSelecionado = recomendacao
+  }
+
+  grid.innerHTML = motores.map(motor => `
+    <div class="motor-card ${motorSelecionado === motor.id ? 'selected' : ''} ${motor.disponivel ? '' : 'disabled'}" onclick="definirMotor('${motor.id}')">
+      <div class="motor-topo">
+        <div class="motor-nome">${motor.nome}</div>
+        <span class="badge ${motor.id === 'hibrido' ? 'b-green' : 'b-cyan'}">${motor.badge}</span>
+      </div>
+      <div class="motor-desc">${motor.desc}</div>
+    </div>
+  `).join('')
+
+  const explicacoes = {
+    photorec: 'Motor selecionado: PhotoRec. Melhor para varredura profunda e casos mais agressivos.',
+    winfr: 'Motor selecionado: Windows File Recovery. Boa opcao para exclusao recente e cenarios NTFS.',
+    hibrido: 'Motor selecionado: Hibrido. Primeiro tenta o Windows File Recovery e depois complementa com o PhotoRec.'
+  }
+  ajuda.textContent = explicacoes[motorSelecionado] || ''
+}
+
+function definirMotor(motor) {
+  if (motor === 'hibrido' && !(infoMotorDisponivel('photorec') && infoMotorDisponivel('winfr'))) return
+  if (motor !== 'hibrido' && !infoMotorDisponivel(motor)) return
+  motorSelecionado = motor
+  renderMotores()
+}
+
+async function carregarMotores() {
+  statusMotores = await ipcRenderer.invoke('scan:profundo:status')
+  renderMotores()
+}
+
+async function carregarDrives() {
+  const drives = await ipcRenderer.invoke('drives:listar')
+  const row = document.getElementById('drivesRow')
+  if (!drives.length) {
+    row.innerHTML = '<div class="empty">Nenhum drive encontrado</div>'
+    return
+  }
+  driveAtivo = drives[0].letra
+  row.innerHTML = drives.map(d => `
+    <div class="drive-card ${d.letra===driveAtivo?'selected':''}" onclick="selecionarDrive('${d.letra}',this)">
+      <div class="drive-letra">${d.letra}</div>
+      <div class="drive-info">Livre: ${fmtBytes(d.livre)}</div>
+      <div class="drive-bar-wrap"><div class="drive-bar" style="width:${d.pct}%"></div></div>
+    </div>`).join('')
+}
+
+function selecionarDrive(letra, el) {
+  driveAtivo = letra
+  document.querySelectorAll('.drive-card').forEach(c => c.classList.remove('selected'))
+  el.classList.add('selected')
+}
+
+async function escolherDestino() {
+  const pasta = await ipcRenderer.invoke('escolher:pasta')
+  if (!pasta) return
+
+  destinoBase = pasta
+  document.getElementById('destinoTexto').textContent = pasta
+  document.getElementById('destinoTexto').style.color = 'var(--green)'
+
+  const driveDestino = extrairDriveDaPasta(pasta)
+  const ajuda = document.getElementById('destinoAjuda')
+  if (driveDestino && driveAtivo && driveDestino === driveAtivo.toUpperCase()) {
+    ajuda.textContent = 'Atencao: a pasta escolhida esta no mesmo drive do scan. Escolha outro drive para proteger os dados.'
+    ajuda.style.color = 'var(--orange)'
+  } else {
+    ajuda.textContent = 'O RecoverX criara automaticamente uma subpasta exclusiva do scan dentro desta pasta.'
+    ajuda.style.color = 'var(--muted)'
+  }
+}
+
+function marcarTodos() { document.querySelectorAll('.tipo-check input').forEach(c => c.checked = true) }
+function desmarcarTodos() { document.querySelectorAll('.tipo-check input').forEach(c => c.checked = false) }
+
+async function iniciarScanProfundo() {
+  if (!driveAtivo) {
+    avisoModal('Selecione um drive de origem para o scan profundo.')
+    return
+  }
+  if (!destinoBase) {
+    avisoModal('Escolha a pasta onde os arquivos encontrados serao salvos.')
+    return
+  }
+
+  const driveDestino = extrairDriveDaPasta(destinoBase)
+  if (driveDestino && driveDestino === driveAtivo.toUpperCase()) {
+    avisoModal('Escolha uma pasta de salvamento em outro drive. Isso ajuda a evitar sobrescrita dos arquivos durante a recuperacao.')
+    return
+  }
+
+  const tipos = obterTiposSelecionados()
+  if (!tipos.length) {
+    avisoModal('Selecione pelo menos um tipo de arquivo para mostrar nos resultados.')
+    return
+  }
+
+  document.getElementById('boxConfig').style.display = 'none'
+  document.getElementById('boxScanAtivo').style.display = 'block'
+  document.getElementById('boxResultadoProf').style.display = 'none'
+  document.getElementById('scanProfBar').style.width = '0%'
+  document.getElementById('scanSubtexto').textContent = motorSelecionado === 'hibrido'
+    ? 'Executando os dois motores em sequencia para tentar localizar mais arquivos.'
+    : 'Vasculhando o disco. Esse processo pode levar varios minutos.'
+  document.getElementById('logScan').innerHTML = ''
+
+  setTimeout(() => {
+    document.getElementById('scanProfBar').style.width = '82%'
+  }, 500)
+
+  const progLog = (e, data) => {
+    if (!data || !data.texto) return
+    const prefixo = data.motor === 'winfr' ? '[WinFR] ' : (data.motor === 'photorec' ? '[PhotoRec] ' : '')
+    addLog('logScan', data.erro ? 'erro' : 'cyan', prefixo + data.texto.trim().slice(0, 160))
+  }
+  ipcRenderer.on('scan:progresso', progLog)
+
+  const res = await ipcRenderer.invoke('scan:profundo:iniciar', {
+    drive: driveAtivo,
+    destinoBase,
+    tipos,
+    motor: motorSelecionado
+  })
+
+  ipcRenderer.removeListener('scan:progresso', progLog)
+  document.getElementById('scanProfBar').style.width = '100%'
+
+  if (!res.sucesso && res.instrucoes) {
+    document.getElementById('boxScanAtivo').style.display = 'none'
+    document.getElementById('boxConfig').style.display = 'block'
+    document.getElementById('avisoMotores').style.display = 'block'
+    return
+  }
+
+  if (!res.sucesso) {
+    document.getElementById('boxScanAtivo').style.display = 'none'
+    document.getElementById('boxConfig').style.display = 'block'
+    aviso('erro', 'Erro no scan profundo: ' + res.erro)
+    return
+  }
+
+  destinoPastaScan = res.destino
+  const arquivosBrutos = await ipcRenderer.invoke('scan:profundo:listar', destinoPastaScan)
+  const arquivosFiltrados = filtrarArquivosPorTipos(arquivosBrutos, tipos)
+
+  fs.writeFileSync(path.join(dataDir, 'scan_atual.json'), JSON.stringify(arquivosFiltrados, null, 2))
+  await ipcRenderer.invoke('dados:salvar', 'scan_meta', {
+    tipoScan: 'profundo',
+    driveOrigem: driveAtivo,
+    pastaSalvamentoBase: destinoBase,
+    pastaRecuperacao: destinoPastaScan,
+    tiposSelecionados: tipos,
+    motorSelecionado,
+    motoresExecutados: res.motoresExecutados || [],
+    totalBruto: arquivosBrutos.length,
+    totalEncontrado: arquivosFiltrados.length,
+    cancelado: !!res.cancelado,
+    avisos: res.avisos || [],
+    atualizadoEm: new Date().toISOString()
+  })
+
+  document.getElementById('boxScanAtivo').style.display = 'none'
+  document.getElementById('boxResultadoProf').style.display = 'block'
+  document.getElementById('tituloResultadoProf').textContent = res.cancelado ? 'Scan interrompido' : 'Scan concluido'
+  document.getElementById('resProftexto').textContent = `${arquivosFiltrados.length} arquivos compativeis encontrados e organizados em ${destinoPastaScan}`
+
+  const ignorados = Math.max(0, arquivosBrutos.length - arquivosFiltrados.length)
+  const motoresTexto = (res.motoresExecutados || []).length
+    ? (res.motoresExecutados || []).map(nomeMotor).join(' + ')
+    : nomeMotor(motorSelecionado)
+  document.getElementById('resProfDetalhe').textContent = ignorados
+    ? `Motores usados: ${motoresTexto}. Foram localizados ${arquivosBrutos.length} arquivos no total. Exibindo ${arquivosFiltrados.length} conforme os tipos selecionados.`
+    : `Motores usados: ${motoresTexto}. Subpasta criada automaticamente para este scan: ${destinoPastaScan}`
+
+  const avisoEl = document.getElementById('resProfAvisos')
+  if (res.avisos && res.avisos.length) {
+    avisoEl.style.display = 'block'
+    avisoEl.textContent = res.avisos.join(' | ')
+  } else {
+    avisoEl.style.display = 'none'
+    avisoEl.textContent = ''
+  }
+}
+
+async function pararScan() {
+  await ipcRenderer.invoke('scan:profundo:parar')
+  addLog('logScan', 'info', 'Scan interrompido pelo usuario.')
+}
+
+function verResultadosProf() {
+  window.parent.ir('pages/resultados.html', null)
+}
+
+async function abrirDestino() {
+  const pasta = destinoPastaScan || destinoBase
+  if (pasta) await ipcRenderer.invoke('abrir:pasta', pasta)
+}
+
+carregarMotores()
+carregarDrives()
+</script>
+</body></html>

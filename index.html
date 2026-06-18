@@ -1,0 +1,146 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>RecoverX</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/licenca.js"></script>
+<script>
+  if (!licencaAtivaRX()) {
+    window.location.replace('pages/licenca.html')
+  }
+</script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon" style="padding:0;overflow:hidden">
+        <img src="logo_64.png" alt="RecoverX" style="width:40px;height:40px;object-fit:cover;border-radius:12px">
+      </div>
+      <div>
+        <div class="logo-brand"><span>Recover</span>X</div>
+        <div class="logo-sub">GHZ Plugin v1.0</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" onclick="ir('pages/dashboard.html',this)">
+        <span class="nav-icon">DB</span> Dashboard
+      </button>
+
+      <div class="nav-sep">Recuperacao</div>
+
+      <button class="nav-btn" onclick="ir('pages/scan_rapido.html',this)">
+        <span class="nav-icon">SR</span> Scan Rapido
+      </button>
+      <button class="nav-btn" onclick="ir('pages/scan_profundo.html',this)">
+        <span class="nav-icon">SP</span> Scan Profundo
+      </button>
+      <button class="nav-btn" onclick="ir('pages/resultados.html',this)">
+        <span class="nav-icon">RS</span> Resultados
+        <span class="nav-badge" id="badgeResultados" style="display:none">0</span>
+      </button>
+
+      <div class="nav-sep">Ferramentas</div>
+
+      <button class="nav-btn" onclick="ir('pages/limpeza.html',this)">
+        <span class="nav-icon">LJ</span> Limpeza de Junk
+      </button>
+      <button class="nav-btn" onclick="ir('pages/historico.html',this)">
+        <span class="nav-icon">HI</span> Historico
+      </button>
+
+      <div class="nav-sep">Info</div>
+
+      <button class="nav-btn" onclick="ir('pages/sobre.html',this)">
+        <span class="nav-icon">SB</span> Sobre
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="margin-bottom:8px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-align:center">
+          Licenca: <span id="licKeyShort" style="color:var(--cyan);font-family:monospace"></span>
+        </div>
+      </div>
+      <div class="sidebar-brand">
+        <div style="color:var(--muted)">Desenvolvido por</div>
+        <div style="color:var(--border2);font-weight:700">GHZ Plugin</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbarTitle">Dashboard</div>
+      <div class="topbar-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusTexto">Pronto</span>
+      </div>
+    </div>
+    <div class="page">
+      <iframe id="frame" class="iframe-page" src="pages/dashboard.html"></iframe>
+    </div>
+  </div>
+</div>
+
+<script>
+const fs = require('fs')
+const path = require('path')
+
+const TITULOS = {
+  'dashboard.html': 'Dashboard',
+  'scan_rapido.html': 'Scan Rapido',
+  'scan_profundo.html': 'Scan Profundo',
+  'resultados.html': 'Resultados da Recuperacao',
+  'limpeza.html': 'Limpeza de Arquivos Junk',
+  'historico.html': 'Historico de Recuperacoes',
+  'sobre.html': 'Sobre o RecoverX'
+}
+
+function ir(url, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  if (btn) btn.classList.add('active')
+  document.getElementById('frame').src = url
+  document.getElementById('topbarTitle').textContent = TITULOS[url.split('/').pop()] || url
+}
+
+document.getElementById('frame').addEventListener('load', () => {
+  try {
+    const doc = document.getElementById('frame').contentDocument
+    doc.body.style.overflowY = 'auto'
+    doc.body.style.height = 'auto'
+  } catch (e) {}
+})
+
+try {
+  const k = getLicencaRX()
+  if (k) document.getElementById('licKeyShort').textContent = k.slice(0, 9) + '...'
+} catch (e) {}
+
+setInterval(() => {
+  try {
+    const dataDir = process.argv.find(a => a.startsWith('--data-dir=')).replace('--data-dir=', '')
+    const scanPath = path.join(dataDir, 'scan_atual.json')
+    const badge = document.getElementById('badgeResultados')
+    if (!fs.existsSync(scanPath)) {
+      badge.style.display = 'none'
+      return
+    }
+
+    const dados = JSON.parse(fs.readFileSync(scanPath, 'utf8'))
+    if (Array.isArray(dados) && dados.length > 0) {
+      badge.textContent = dados.length > 999 ? '999+' : dados.length
+      badge.style.display = 'inline-flex'
+    } else {
+      badge.style.display = 'none'
+    }
+  } catch (e) {
+    const badge = document.getElementById('badgeResultados')
+    if (badge) badge.style.display = 'none'
+  }
+}, 3000)
+</script>
+</body>
+</html>

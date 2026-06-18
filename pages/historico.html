@@ -1,0 +1,71 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/util.js"></script>
+</head><body>
+<div class="page-content">
+
+<div class="page-hdr-row page-hdr">
+  <div>
+    <h1>🕓 <span>Histórico</span></h1>
+    <p>Todas as recuperações realizadas</p>
+  </div>
+  <button class="btn btn-danger btn-sm" onclick="limparHist()">🗑️ Limpar Histórico</button>
+</div>
+
+<div id="histBox">
+  <div class="empty">
+    <div class="empty-icon">🕓</div>
+    Nenhuma recuperação realizada ainda.
+  </div>
+</div>
+
+<div class="aviso av-ok" id="avisoOk"></div>
+<div class="aviso av-err" id="avisoErro"></div>
+
+<script>
+const fs   = require('fs')
+const path = require('path')
+const dataDir = process.argv.find(a=>a.startsWith('--data-dir=')).replace('--data-dir=','')
+
+function renderHist() {
+  const box = document.getElementById('histBox')
+  try {
+    const arq = path.join(dataDir,'historico.json')
+    if (!fs.existsSync(arq)) return
+    const hist = JSON.parse(fs.readFileSync(arq,'utf8'))
+    if (!hist.length) return
+    box.innerHTML = hist.map(h => `
+      <div style="padding:16px 18px;background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:44px;height:44px;border-radius:10px;background:var(--cyan-bg);border:1px solid var(--cyan-bdr);display:flex;align-items:center;justify-content:center;font-size:20px">✅</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--fg)">${h.data}</div>
+            <div style="font-size:12px;color:var(--fg2);margin-top:3px">
+              <span style="color:var(--green)">${h.recuperados} arquivos recuperados</span>
+              ${h.erros > 0 ? ` • <span style="color:var(--red)">${h.erros} erros</span>` : ''}
+              • ${fmtBytes(h.tamanho||0)}
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px">
+              📁 ${h.destino||'—'}
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="require('electron').shell.openPath('${(h.destino||'').replace(/\\/g,'\\\\')}')" style="flex-shrink:0">
+          📂 Abrir
+        </button>
+      </div>`).join('')
+  } catch(e) {}
+}
+
+function limparHist() {
+  confirmar('Limpar todo o histórico?', ok => {
+    if (!ok) return
+    try { fs.writeFileSync(path.join(dataDir,'historico.json'),'[]') } catch(e) {}
+    document.getElementById('histBox').innerHTML = '<div class="empty"><div class="empty-icon">🕓</div>Nenhuma recuperação realizada ainda.</div>'
+    aviso('ok','✅ Histórico limpo!')
+  })
+}
+
+renderHist()
+</script>
+</body></html>

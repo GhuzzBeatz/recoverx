@@ -1,0 +1,158 @@
+﻿<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/util.js"></script>
+</head><body>
+<div class="page-content">
+
+<div class="page-hdr-row page-hdr">
+  <div>
+    <h1><span>Dashboard</span></h1>
+    <p>Visao geral dos drives e status do sistema</p>
+  </div>
+  <button class="btn btn-primary" onclick="atualizarDrives()">Atualizar</button>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card s-cyan">
+    <div class="stat-icon">DRV</div>
+    <div class="stat-valor sv-cyan" id="statDrives">-</div>
+    <div class="stat-label">Drives Detectados</div>
+  </div>
+  <div class="stat-card s-green">
+    <div class="stat-icon">OK</div>
+    <div class="stat-valor sv-green" id="statRecuperados">0</div>
+    <div class="stat-label">Arquivos Recuperados</div>
+  </div>
+  <div class="stat-card s-orange">
+    <div class="stat-icon">LIX</div>
+    <div class="stat-valor sv-orange" id="statLixeira">-</div>
+    <div class="stat-label">Na Lixeira</div>
+  </div>
+  <div class="stat-card s-purple">
+    <div class="stat-icon">LIV</div>
+    <div class="stat-valor sv-purple" id="statLiberado">-</div>
+    <div class="stat-label">Espaco Liberado</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Drives Disponiveis</span>
+    <span class="badge b-cyan" id="labelDrives">Carregando...</span>
+  </div>
+  <div class="card-body" style="padding:16px">
+    <div class="drives-row" id="drivesRow">
+      <div style="text-align:center;color:var(--muted);padding:32px;width:100%">
+        <div style="font-size:24px;margin-bottom:12px">...</div>
+        Carregando drives...
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="card card-glow" style="border-color:var(--cyan-bdr)">
+    <div class="card-header" style="border-color:var(--cyan-bdr)">
+      <span class="card-title">Acao Rapida</span>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-primary btn-lg" onclick="irPara('scan_rapido.html')" style="justify-content:center">
+        Iniciar Scan Rapido
+      </button>
+      <button class="btn btn-purple btn-lg" onclick="irPara('scan_profundo.html')" style="justify-content:center">
+        Scan Profundo Hibrido
+      </button>
+      <button class="btn btn-ghost" onclick="irPara('limpeza.html')" style="justify-content:center">
+        Limpar Arquivos Junk
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">O que cada scan faz</span></div>
+    <div class="card-body" style="font-size:13px;color:var(--fg2);line-height:2">
+      <div style="margin-bottom:10px">
+        <strong style="color:var(--cyan)">Scan Rapido</strong><br>
+        Recupera arquivos da lixeira, pastas temporarias e arquivos recentes deletados. Resultado em segundos.
+      </div>
+      <div>
+        <strong style="color:var(--purple)">Scan Profundo</strong><br>
+        Combina PhotoRec e Windows File Recovery quando disponiveis. Ajuda a encontrar mais arquivos em casos recentes e tambem em varredura bruta do disco.
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const { ipcRenderer } = require('electron')
+const fs = require('fs')
+const path = require('path')
+
+const dataDir = process.argv.find(a => a.startsWith('--data-dir=')).replace('--data-dir=', '')
+
+function irPara(pag) {
+  window.parent.ir('pages/' + pag, null)
+  window.parent.document.querySelectorAll('.nav-btn').forEach(b => {
+    if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(pag)) {
+      b.classList.add('active')
+    } else {
+      b.classList.remove('active')
+    }
+  })
+}
+
+async function atualizarDrives() {
+  document.getElementById('labelDrives').textContent = 'Carregando...'
+  document.getElementById('drivesRow').innerHTML = '<div style="text-align:center;color:var(--muted);padding:32px;width:100%;grid-column:1/-1">Detectando drives...</div>'
+
+  const drives = await ipcRenderer.invoke('drives:listar')
+  const row = document.getElementById('drivesRow')
+  document.getElementById('statDrives').textContent = drives.length
+
+  if (!drives.length) {
+    row.innerHTML = '<div class="empty"><div class="empty-icon">DRV</div>Nenhum drive detectado</div>'
+    return
+  }
+
+  row.innerHTML = drives.map(d => `
+    <div class="drive-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="drive-letra">${d.letra}</div>
+        <span class="badge b-cyan">${d.pct}% usado</span>
+      </div>
+      <div class="drive-info">
+        Total: ${fmtBytes(d.total)}<br>
+        Livre: <strong style="color:var(--green)">${fmtBytes(d.livre)}</strong>
+      </div>
+      <div class="drive-bar-wrap">
+        <div class="drive-bar" style="width:${d.pct}%"></div>
+      </div>
+    </div>`).join('')
+
+  document.getElementById('labelDrives').textContent = drives.length + ' drive(s)'
+
+  let totalLixeira = 0
+  for (const d of drives) {
+    try {
+      const res = await ipcRenderer.invoke('scan:lixeira', d.letra)
+      totalLixeira += res.length
+    } catch (e) {}
+  }
+  document.getElementById('statLixeira').textContent = totalLixeira
+
+  try {
+    const hist = JSON.parse(fs.readFileSync(path.join(dataDir, 'historico.json'), 'utf8'))
+    document.getElementById('statRecuperados').textContent = hist.reduce((s, h) => s + (h.recuperados || 0), 0)
+    const liberado = hist.reduce((s, h) => s + (h.liberado || 0), 0)
+    document.getElementById('statLiberado').textContent = fmtBytes(liberado)
+  } catch (e) {
+    document.getElementById('statRecuperados').textContent = '0'
+    document.getElementById('statLiberado').textContent = '0 B'
+  }
+}
+
+atualizarDrives()
+</script>
+</body></html>

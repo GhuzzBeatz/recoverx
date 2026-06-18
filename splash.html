@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box }
+  html, body {
+    width:100%; height:100%;
+    background:#060810;
+    font-family:'Segoe UI',system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; user-select:none;
+  }
+
+  .container { text-align:center; display:flex; flex-direction:column; align-items:center; gap:28px }
+
+  .logo-wrap {
+    width:100px; height:100px; border-radius:24px;
+    overflow:hidden;
+    box-shadow:0 0 60px rgba(0,212,255,.4), 0 0 120px rgba(0,212,255,.15);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  .logo-wrap img { width:100%; height:100%; object-fit:cover }
+
+  @keyframes pulse {
+    0%,100% { box-shadow:0 0 40px rgba(0,212,255,.3),0 0 80px rgba(0,212,255,.1) }
+    50%      { box-shadow:0 0 80px rgba(0,212,255,.6),0 0 160px rgba(0,212,255,.25) }
+  }
+
+  .nome {
+    font-size:40px; font-weight:900; letter-spacing:-1px;
+    color:#fff;
+  }
+  .nome span { color:#00d4ff }
+
+  .sub { font-size:13px; color:#3a4560; letter-spacing:.05em }
+
+  /* RING SCANNER */
+  .ring-wrap { position:relative; width:70px; height:70px }
+  .ring {
+    position:absolute; inset:0;
+    border-radius:50%; border:3px solid #0c0f1a;
+    border-top-color:#00d4ff;
+    animation:spin 1s linear infinite;
+  }
+  .ring2 {
+    position:absolute; inset:8px;
+    border-radius:50%; border:2px solid #0c0f1a;
+    border-bottom-color:#a855f7;
+    animation:spin 1.5s linear infinite reverse;
+  }
+  .ring3 {
+    position:absolute; inset:16px;
+    border-radius:50%; border:2px solid #0c0f1a;
+    border-top-color:#00e5a0;
+    animation:spin 2s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg) } }
+
+  /* PROGRESS BAR */
+  .bar-wrap {
+    width:260px; height:3px; background:#0c0f1a;
+    border-radius:99px; overflow:hidden;
+  }
+  .bar {
+    height:100%; border-radius:99px; width:0%;
+    background:linear-gradient(90deg,#00d4ff,#a855f7);
+    transition:width .4s ease;
+    position:relative; overflow:hidden;
+  }
+  .bar::after {
+    content:''; position:absolute; top:0; left:-100%; bottom:0; width:100%;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);
+    animation:shimmer 1.5s infinite;
+  }
+  @keyframes shimmer { to { left:200% } }
+
+  .status-txt { font-size:12px; color:#3a4560; height:18px; transition:opacity .3s }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo-wrap">
+    <img src="logo.png" alt="RecoverX">
+  </div>
+
+  <div>
+    <div class="nome"><span>Recover</span>X</div>
+    <div class="sub">GHZ Plugin • Recuperação de Arquivos</div>
+  </div>
+
+  <div class="ring-wrap">
+    <div class="ring"></div>
+    <div class="ring2"></div>
+    <div class="ring3"></div>
+  </div>
+
+  <div>
+    <div class="bar-wrap"><div class="bar" id="bar"></div></div>
+    <div class="status-txt" id="status" style="margin-top:10px">Iniciando...</div>
+  </div>
+</div>
+
+<script>
+const steps = [
+  [15,  'Verificando sistema...'],
+  [35,  'Carregando módulos...'],
+  [60,  'Detectando drives...'],
+  [80,  'Preparando interface...'],
+  [95,  'Quase pronto...'],
+  [100, 'Pronto!'],
+]
+let i = 0
+function next() {
+  if (i >= steps.length) return
+  const [pct, txt] = steps[i++]
+  document.getElementById('bar').style.width = pct + '%'
+  document.getElementById('status').textContent = txt
+  if (i < steps.length) setTimeout(next, 600 + Math.random()*400)
+}
+setTimeout(next, 300)
+</script>
+</body>
+</html>

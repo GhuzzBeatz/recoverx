@@ -1,0 +1,141 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/util.js"></script>
+</head><body>
+<div class="page-content">
+
+<div class="page-hdr">
+  <h1>🧹 Limpeza de <span>Junk</span></h1>
+  <p>Limpa arquivos temporários e libera espaço no disco</p>
+</div>
+
+<!-- CATEGORIAS -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">🎯 O que limpar</span></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px">
+        <input type="checkbox" id="chkTemp" checked style="accent-color:var(--cyan);width:15px;height:15px">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--fg)">🗂️ Arquivos Temporários</div>
+          <div style="font-size:11px;color:var(--muted)">%TEMP%, AppData\Local\Temp</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px">
+        <input type="checkbox" id="chkCache" checked style="accent-color:var(--cyan);width:15px;height:15px">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--fg)">🌐 Cache de Internet</div>
+          <div style="font-size:11px;color:var(--muted)">INetCache, WebCache</div>
+        </div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:9px">
+        <input type="checkbox" id="chkWinTemp" checked style="accent-color:var(--cyan);width:15px;height:15px">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--fg)">🪟 Temp do Windows</div>
+          <div style="font-size:11px;color:var(--muted)">C:\Windows\Temp</div>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" id="cardAnalise">
+    <div class="card-header"><span class="card-title">📊 Análise</span></div>
+    <div class="card-body" style="text-align:center;padding:28px">
+      <div style="font-size:48px;margin-bottom:12px">🔍</div>
+      <div style="font-size:14px;color:var(--fg2);margin-bottom:16px">
+        Clique em "Analisar" para ver quanto pode ser liberado
+      </div>
+      <button class="btn btn-primary" id="btnAnalisar" onclick="analisar()" style="width:100%;justify-content:center">
+        🔍 Analisar Agora
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- RESULTADO ANÁLISE -->
+<div id="boxAnalise" style="display:none">
+  <div class="card card-glow" style="border-color:var(--cyan-bdr)">
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px">
+        <div style="background:var(--cyan-bg);border:1px solid var(--cyan-bdr);border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--cyan)" id="analArquivos">0</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px">Arquivos encontrados</div>
+        </div>
+        <div style="background:var(--orange-bg);border:1px solid rgba(255,165,2,.2);border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--orange)" id="analTamanho">0 B</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px">Espaço ocupado</div>
+        </div>
+        <div style="background:var(--green-bg);border:1px solid rgba(0,229,160,.2);border-radius:12px;padding:16px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--green)" id="analLivre">—</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px">Será liberado</div>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-lg" id="btnLimpar" onclick="limpar()" style="width:100%;justify-content:center">
+        🗑️ Limpar Tudo Agora
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTADO LIMPEZA -->
+<div id="boxLimpeza" style="display:none">
+  <div class="card" style="border-color:rgba(0,229,160,.3)">
+    <div class="card-body" style="text-align:center;padding:28px">
+      <div style="font-size:48px;margin-bottom:12px">✨</div>
+      <div style="font-size:20px;font-weight:900;color:var(--green);margin-bottom:8px">Limpeza Concluída!</div>
+      <div style="font-size:14px;color:var(--cyan);font-weight:700;margin-bottom:20px" id="resLimpeza">
+        0 arquivos deletados • 0 B liberados
+      </div>
+      <button class="btn btn-ghost" onclick="novaBusca()">🔄 Nova Análise</button>
+    </div>
+  </div>
+</div>
+
+<div class="aviso av-ok" id="avisoOk"></div>
+<div class="aviso av-err" id="avisoErro"></div>
+
+<script>
+const { ipcRenderer } = require('electron')
+let arquivosTemp = []
+
+async function analisar() {
+  document.getElementById('btnAnalisar').disabled = true
+  document.getElementById('btnAnalisar').textContent = '⏳ Analisando...'
+
+  arquivosTemp = await ipcRenderer.invoke('scan:temp')
+
+  document.getElementById('analArquivos').textContent = arquivosTemp.length
+  const total = arquivosTemp.reduce((s,a)=>s+(a.tamanho||0),0)
+  document.getElementById('analTamanho').textContent = fmtBytes(total)
+  document.getElementById('analLivre').textContent   = fmtBytes(total)
+
+  document.getElementById('boxAnalise').style.display = 'block'
+  document.getElementById('btnAnalisar').disabled = false
+  document.getElementById('btnAnalisar').textContent = '🔄 Reanalisar'
+}
+
+async function limpar() {
+  if (!arquivosTemp.length) return
+  const btn = document.getElementById('btnLimpar')
+  btn.disabled = true; btn.textContent = '⏳ Limpando...'
+
+  const res = await ipcRenderer.invoke('limpar:temp', arquivosTemp)
+
+  document.getElementById('boxAnalise').style.display = 'none'
+  document.getElementById('boxLimpeza').style.display = 'block'
+  document.getElementById('resLimpeza').textContent =
+    `${res.deletados} arquivos deletados • ${fmtBytes(res.liberado)} liberados`
+
+  btn.disabled = false; btn.textContent = '🗑️ Limpar Tudo Agora'
+}
+
+function novaBusca() {
+  arquivosTemp = []
+  document.getElementById('boxAnalise').style.display = 'none'
+  document.getElementById('boxLimpeza').style.display = 'none'
+  document.getElementById('btnAnalisar').textContent = '🔍 Analisar Agora'
+}
+</script>
+</body></html>

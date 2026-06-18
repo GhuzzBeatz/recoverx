@@ -1,0 +1,11 @@
+﻿node_modules/
+dist/
+dist_installer/
+*.log
+*.exe
+*.msi
+*.zip
+*.blockmap
+Thumbs.db
+.DS_Store
+{css,js,pages,assets}/

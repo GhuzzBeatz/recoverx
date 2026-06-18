@@ -1,0 +1,337 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/util.js"></script>
+</head><body>
+<div class="page-content">
+
+<div class="page-hdr-row page-hdr">
+  <div>
+    <h1>Resultados</h1>
+    <p id="subtituloResultados">Selecione os arquivos que deseja recuperar.</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn btn-ghost btn-sm" onclick="toggleView()" id="btnView">Grade</button>
+    <button class="btn btn-primary" id="btnAcaoArquivos" onclick="processarSelecionados()" disabled>
+      Recuperar Selecionados (<span id="countSel">0</span>)
+    </button>
+  </div>
+</div>
+
+<div id="infoScanMeta" class="card" style="display:none">
+  <div class="card-body" style="padding:14px 18px">
+    <div style="font-size:12px;color:var(--fg2);line-height:1.8" id="textoScanMeta"></div>
+  </div>
+</div>
+
+<div class="filter-row">
+  <span style="font-size:11px;color:var(--muted);font-weight:700;flex-shrink:0">FILTRAR:</span>
+  <button class="filter-btn ativo" data-tipo="todos" onclick="filtrar('todos',this)">Todos <span id="cntTodos">0</span></button>
+  <button class="filter-btn" data-tipo="foto" onclick="filtrar('foto',this)">Fotos <span id="cntFoto">0</span></button>
+  <button class="filter-btn" data-tipo="documento" onclick="filtrar('documento',this)">Docs <span id="cntDoc">0</span></button>
+  <button class="filter-btn" data-tipo="video" onclick="filtrar('video',this)">Videos <span id="cntVideo">0</span></button>
+  <button class="filter-btn" data-tipo="audio" onclick="filtrar('audio',this)">Audio <span id="cntAudio">0</span></button>
+  <button class="filter-btn" data-tipo="comprimido" onclick="filtrar('comprimido',this)">Compactados <span id="cntZip">0</span></button>
+  <div style="margin-left:auto;display:flex;gap:6px">
+    <button class="btn btn-ghost btn-sm" onclick="selecionarTodos()">Selecionar Todos</button>
+    <button class="btn btn-ghost btn-sm" onclick="deselecionarTodos()">Desmarcar</button>
+  </div>
+</div>
+
+<div id="areaArquivos">
+  <div class="empty">
+    <div class="empty-icon">-</div>
+    Nenhum scan realizado.<br>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="window.parent.document.querySelector('[onclick*=scan_rapido]').click()">
+      Fazer Scan Agora
+    </button>
+  </div>
+</div>
+
+<div id="boxRecuperacao" style="display:none">
+  <div class="card" style="margin-top:16px;border-color:rgba(0,229,160,.3)">
+    <div class="card-header" style="border-color:rgba(0,229,160,.2)">
+      <span class="card-title" style="color:var(--green)" id="tituloAcaoConcluida">Processo concluido</span>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="background:var(--green-bg);border:1px solid rgba(0,229,160,.2);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--green)" id="recOk">0</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px" id="labelAcaoOk">Arquivos processados com sucesso</div>
+        </div>
+        <div style="background:var(--red-bg);border:1px solid rgba(255,71,87,.2);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:28px;font-weight:900;color:var(--red)" id="recErr">0</div>
+          <div style="font-size:11px;color:var(--fg2);margin-top:4px">Erros</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-success" onclick="abrirDestinoFinal()" style="flex:1;justify-content:center">Abrir Pasta</button>
+        <button class="btn btn-primary" onclick="exportarPDF()">PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="aviso av-ok" id="avisoOk"></div>
+<div class="aviso av-err" id="avisoErro"></div>
+
+<style>
+.loading-overlay {
+  position:fixed; inset:0; background:rgba(6,8,16,.85);
+  z-index:9999; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:16px;
+  backdrop-filter:blur(4px);
+}
+.loading-overlay .ring { width:60px;height:60px;border-radius:50%;border:3px solid #0c0f1a;border-top-color:#00d4ff;animation:spin 1s linear infinite }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-overlay p { color:#00d4ff;font-weight:700;font-size:14px }
+</style>
+
+<script>
+const { ipcRenderer } = require('electron')
+const fs = require('fs')
+const path = require('path')
+const dataDir = process.argv.find(a => a.startsWith('--data-dir=')).replace('--data-dir=', '')
+
+let todos = []
+let filtrados = []
+let modoGrade = true
+let filtroAtivo = 'todos'
+let ultimoDestino = null
+let metaScan = null
+
+const idxSelecionados = new Set()
+
+function mostrarLoading(txt) {
+  let el = document.getElementById('loadingOverlay')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'loadingOverlay'
+    el.className = 'loading-overlay'
+    document.body.appendChild(el)
+  }
+  el.innerHTML = `<div class="ring"></div><p>${txt}</p>`
+  el.style.display = 'flex'
+}
+
+function esconderLoading() {
+  const el = document.getElementById('loadingOverlay')
+  if (el) el.style.display = 'none'
+}
+
+function eScanProfundo() {
+  return metaScan && metaScan.tipoScan === 'profundo'
+}
+
+function formatarNomeMotor(motor) {
+  return motor === 'winfr' ? 'Windows File Recovery' : (motor === 'photorec' ? 'PhotoRec' : motor)
+}
+
+function aplicarMetaScan() {
+  const subtitulo = document.getElementById('subtituloResultados')
+  const btnAcao = document.getElementById('btnAcaoArquivos')
+  const infoBox = document.getElementById('infoScanMeta')
+  const infoTxt = document.getElementById('textoScanMeta')
+  const tituloAcao = document.getElementById('tituloAcaoConcluida')
+  const labelAcaoOk = document.getElementById('labelAcaoOk')
+
+  if (eScanProfundo()) {
+    subtitulo.textContent = 'Os arquivos abaixo ja foram encontrados no scan profundo. Selecione o que deseja copiar para outra pasta.'
+    btnAcao.innerHTML = 'Copiar Selecionados (<span id="countSel">0</span>)'
+    tituloAcao.textContent = 'Copia concluida'
+    labelAcaoOk.textContent = 'Arquivos copiados com sucesso'
+    infoBox.style.display = 'block'
+    infoTxt.innerHTML = `
+      <strong style="color:var(--fg)">Drive escaneado:</strong> ${metaScan.driveOrigem || '-'}<br>
+      <strong style="color:var(--fg)">Motores usados:</strong> ${Array.isArray(metaScan.motoresExecutados) && metaScan.motoresExecutados.length ? metaScan.motoresExecutados.map(formatarNomeMotor).join(' + ') : formatarNomeMotor(metaScan.motorSelecionado || '-')}<br>
+      <strong style="color:var(--fg)">Pasta escolhida para salvar:</strong> ${metaScan.pastaSalvamentoBase || '-'}<br>
+      <strong style="color:var(--fg)">Subpasta criada pelo app:</strong> ${metaScan.pastaRecuperacao || '-'}
+    `
+  } else {
+    subtitulo.textContent = 'Selecione os arquivos que deseja recuperar.'
+    btnAcao.innerHTML = 'Recuperar Selecionados (<span id="countSel">0</span>)'
+    tituloAcao.textContent = 'Recuperacao concluida'
+    labelAcaoOk.textContent = 'Arquivos recuperados com sucesso'
+    infoBox.style.display = 'none'
+  }
+}
+
+async function carregar() {
+  try {
+    const arq = path.join(dataDir, 'scan_atual.json')
+    if (!fs.existsSync(arq)) return
+    mostrarLoading('Carregando arquivos...')
+    todos = JSON.parse(fs.readFileSync(arq, 'utf8'))
+    metaScan = await ipcRenderer.invoke('dados:ler', 'scan_meta')
+    if (!metaScan || Array.isArray(metaScan)) metaScan = null
+    idxSelecionados.clear()
+    aplicarMetaScan()
+    atualizarContadores()
+    renderArquivos()
+    esconderLoading()
+  } catch (e) {
+    esconderLoading()
+  }
+}
+
+function atualizarContadores() {
+  document.getElementById('cntTodos').textContent = todos.length
+  document.getElementById('cntFoto').textContent = todos.filter(a => a.tipo === 'foto').length
+  document.getElementById('cntDoc').textContent = todos.filter(a => a.tipo === 'documento').length
+  document.getElementById('cntVideo').textContent = todos.filter(a => a.tipo === 'video').length
+  document.getElementById('cntAudio').textContent = todos.filter(a => a.tipo === 'audio').length
+  document.getElementById('cntZip').textContent = todos.filter(a => a.tipo === 'comprimido').length
+}
+
+function filtrar(tipo, btn) {
+  filtroAtivo = tipo
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('ativo'))
+  btn.classList.add('ativo')
+  renderArquivos()
+}
+
+function renderArquivos() {
+  filtrados = []
+  for (let i = 0; i < todos.length; i++) {
+    if (filtroAtivo === 'todos' || todos[i].tipo === filtroAtivo) {
+      filtrados.push({ idx: i, arq: todos[i] })
+    }
+  }
+
+  const area = document.getElementById('areaArquivos')
+  if (!filtrados.length) {
+    area.innerHTML = '<div class="empty"><div class="empty-icon">-</div>Nenhum arquivo nesta categoria.</div>'
+    return
+  }
+
+  const slice = filtrados.slice(0, 500)
+
+  if (modoGrade) {
+    area.innerHTML = `<div class="files-grid">${slice.map(({idx, arq}) => `
+      <div class="file-card ${idxSelecionados.has(idx) ? 'checked' : ''}" data-idx="${idx}">
+        <div class="check">${idxSelecionados.has(idx) ? 'OK' : ''}</div>
+        <div class="file-icon">${extIcone(arq.ext)}</div>
+        <div class="file-nome" title="${arq.nome}">${arq.nome.slice(0, 28)}</div>
+        <div class="file-info">${fmtBytes(arq.tamanho)}</div>
+        <div style="margin-top:4px"><span class="badge b-${badgeTipo(arq.tipo)}">${arq.tipo}</span></div>
+      </div>`).join('')}</div>`
+  } else {
+    area.innerHTML = `<div class="files-list">${slice.map(({idx, arq}) => `
+      <div class="file-row ${idxSelecionados.has(idx) ? 'checked' : ''}" data-idx="${idx}">
+        <div class="check">${idxSelecionados.has(idx) ? 'OK' : ''}</div>
+        <div class="file-row-icon">${extIcone(arq.ext)}</div>
+        <div class="file-row-nome" title="${arq.nome}">${arq.nome}</div>
+        <div class="file-row-info">${fmtBytes(arq.tamanho)}</div>
+        <span class="badge b-${badgeTipo(arq.tipo)}" style="flex-shrink:0">${arq.tipo}</span>
+      </div>`).join('')}</div>`
+  }
+
+  area.onclick = (e) => {
+    const card = e.target.closest('[data-idx]')
+    if (!card) return
+    const idx = parseInt(card.dataset.idx, 10)
+    if (idxSelecionados.has(idx)) {
+      idxSelecionados.delete(idx)
+      card.classList.remove('checked')
+      card.querySelector('.check').textContent = ''
+    } else {
+      idxSelecionados.add(idx)
+      card.classList.add('checked')
+      card.querySelector('.check').textContent = 'OK'
+    }
+    atualizarBotaoAcao()
+  }
+
+  atualizarBotaoAcao()
+}
+
+function badgeTipo(t) {
+  return { foto: 'cyan', documento: 'cyan', video: 'purple', audio: 'green', comprimido: 'orange' }[t] || 'cyan'
+}
+
+function atualizarBotaoAcao() {
+  const n = idxSelecionados.size
+  const countEl = document.getElementById('countSel')
+  if (countEl) countEl.textContent = n
+  document.getElementById('btnAcaoArquivos').disabled = n === 0
+}
+
+function selecionarTodos() {
+  filtrados.forEach(({idx}) => idxSelecionados.add(idx))
+  renderArquivos()
+}
+
+function deselecionarTodos() {
+  filtrados.forEach(({idx}) => idxSelecionados.delete(idx))
+  renderArquivos()
+}
+
+function toggleView() {
+  modoGrade = !modoGrade
+  document.getElementById('btnView').textContent = modoGrade ? 'Grade' : 'Lista'
+  renderArquivos()
+}
+
+async function processarSelecionados() {
+  const arquivosSel = [...idxSelecionados].map(i => todos[i])
+  if (!arquivosSel.length) return
+
+  const destino = await ipcRenderer.invoke('escolher:pasta')
+  if (!destino) return
+  ultimoDestino = destino
+
+  const verbo = eScanProfundo() ? 'Copiando' : 'Recuperando'
+  mostrarLoading(`${verbo} ${arquivosSel.length} arquivos...`)
+  const res = await ipcRenderer.invoke('recuperar:arquivos', { arquivos: arquivosSel, destino })
+  esconderLoading()
+
+  try {
+    const hArq = path.join(dataDir, 'historico.json')
+    const hist = fs.existsSync(hArq) ? JSON.parse(fs.readFileSync(hArq, 'utf8')) : []
+    hist.unshift({
+      id: Date.now(),
+      data: agora(),
+      destino,
+      recuperados: res.ok.length,
+      erros: res.erro.length,
+      tamanho: res.ok.reduce((s, a) => s + (a.tamanho || 0), 0)
+    })
+    fs.writeFileSync(hArq, JSON.stringify(hist, null, 2))
+  } catch (e) {}
+
+  document.getElementById('boxRecuperacao').style.display = 'block'
+  document.getElementById('recOk').textContent = res.ok.length
+  document.getElementById('recErr').textContent = res.erro.length
+  document.getElementById('boxRecuperacao').scrollIntoView({ behavior: 'smooth' })
+}
+
+async function abrirDestinoFinal() {
+  if (ultimoDestino) await ipcRenderer.invoke('abrir:pasta', ultimoDestino)
+}
+
+async function exportarPDF() {
+  const d = agora()
+  const arquivosSel = [...idxSelecionados].map(i => todos[i])
+  const titulo = eScanProfundo() ? 'Relatorio de Copia de Arquivos' : 'Relatorio de Recuperacao'
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:10mm;font-size:12px;color:#1a1a1a}
+  h1{font-size:20px;color:#0ea5e9;margin-bottom:8px}
+  table{width:100%;border-collapse:collapse}th{background:#f1f5f9;padding:7px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#444}
+  td{padding:6px 7px;border-bottom:1px solid #e2e8f0;font-size:11px}
+  .footer{margin-top:24px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center}
+  </style></head><body>
+  <h1>RecoverX - ${titulo}</h1>
+  <p style="font-size:11px;color:#64748b;margin-bottom:16px">${d} | ${arquivosSel.length} arquivos</p>
+  <table><thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Tamanho</th><th>Origem</th></tr></thead>
+  <tbody>${arquivosSel.map((a, i) => `<tr><td>${i + 1}</td><td>${a.nome}</td><td>${a.tipo}</td><td>${fmtBytes(a.tamanho)}</td><td>${a.origem}</td></tr>`).join('')}</tbody></table>
+  <div class="footer">RecoverX - GHZ Plugin | ${d}</div></body></html>`
+
+  const res = await ipcRenderer.invoke('salvar-pdf', {
+    htmlContent: html,
+    nomeArquivo: `RecoverX_${d.replace(/\//g, '-').replace(/\s/g, '_')}.pdf`
+  })
+  if (res.sucesso) aviso('ok', 'PDF gerado com sucesso.')
+}
+
+carregar()
+</script>
+</body></html>

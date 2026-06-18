@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0 }
+  html, body {
+    height:100%; width:100%;
+    font-family:'Segoe UI',system-ui,sans-serif;
+    background:#060810; color:#e8eef8;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+  }
+
+  /* BG PARTICLES */
+  .bg {
+    position:fixed; inset:0; overflow:hidden; z-index:0;
+    background:radial-gradient(ellipse at 20% 50%, rgba(0,212,255,.04) 0%, transparent 60%),
+               radial-gradient(ellipse at 80% 20%, rgba(168,85,247,.04) 0%, transparent 60%);
+  }
+
+  .container {
+    position:relative; z-index:1;
+    width:100%; max-width:460px;
+    padding:24px;
+  }
+
+  /* LOGO */
+  .logo-area { text-align:center; margin-bottom:32px }
+  .logo-img {
+    width:80px; height:80px; border-radius:20px; overflow:hidden;
+    margin:0 auto 14px;
+    box-shadow:0 0 50px rgba(0,212,255,.35), 0 0 100px rgba(0,212,255,.1);
+    animation:glow 3s ease-in-out infinite;
+  }
+  .logo-img img { width:100%; height:100%; object-fit:cover }
+  @keyframes glow {
+    0%,100% { box-shadow:0 0 40px rgba(0,212,255,.3),0 0 80px rgba(0,212,255,.1) }
+    50%      { box-shadow:0 0 70px rgba(0,212,255,.6),0 0 140px rgba(0,212,255,.2) }
+  }
+  .logo-nome { font-size:32px; font-weight:900; letter-spacing:-1px }
+  .logo-nome span { color:#00d4ff }
+  .logo-sub { font-size:12px; color:#3a4560; margin-top:5px; letter-spacing:.05em }
+
+  /* CARD */
+  .card {
+    background:#0f1420; border:1px solid #1a2035;
+    border-radius:20px; overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    position:relative;
+  }
+  .card::before {
+    content:''; position:absolute; top:0; left:10%; right:10%; height:2px;
+    background:linear-gradient(90deg,transparent,#00d4ff,transparent);
+  }
+  .card-header {
+    padding:20px 24px 16px;
+    border-bottom:1px solid #1a2035;
+    text-align:center;
+  }
+  .card-titulo { font-size:16px; font-weight:800; color:#e8eef8 }
+  .card-sub    { font-size:12px; color:#3a4560; margin-top:4px }
+  .card-body   { padding:24px }
+
+  /* INPUT CHAVE */
+  .input-wrap { position:relative; margin-bottom:14px }
+  .input-chave {
+    width:100%; background:#0c0f1a; border:2px solid #1a2035;
+    border-radius:12px; padding:14px 16px;
+    color:#e8eef8; font-size:16px; font-family:'Consolas',monospace;
+    outline:none; text-align:center; letter-spacing:2px;
+    transition:all .2s; text-transform:uppercase;
+  }
+  .input-chave::placeholder { color:#2a3450; letter-spacing:0; font-size:13px; font-family:'Segoe UI',sans-serif }
+  .input-chave:focus { border-color:#00d4ff; box-shadow:0 0 0 4px rgba(0,212,255,.08) }
+  .input-chave.erro  { border-color:#ff4757; box-shadow:0 0 0 4px rgba(255,71,87,.08) }
+  .input-chave.ok    { border-color:#00e5a0; box-shadow:0 0 0 4px rgba(0,229,160,.08) }
+
+  /* BOTÃO */
+  .btn-ativar {
+    width:100%; padding:14px; border:none; border-radius:12px;
+    background:linear-gradient(135deg,#00d4ff,#00b8d9);
+    color:#000; font-size:15px; font-weight:800;
+    cursor:pointer; font-family:inherit;
+    transition:all .2s; display:flex; align-items:center; justify-content:center; gap:8px;
+    box-shadow:0 4px 20px rgba(0,212,255,.35);
+    margin-bottom:12px;
+  }
+  .btn-ativar:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(0,212,255,.5) }
+  .btn-ativar:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none }
+
+  /* FEEDBACK */
+  .feedback {
+    text-align:center; font-size:13px; font-weight:600;
+    padding:10px 14px; border-radius:9px; margin-top:12px;
+    display:none;
+  }
+  .feedback.ok  { background:rgba(0,229,160,.1); color:#00e5a0; border:1px solid rgba(0,229,160,.2) }
+  .feedback.err { background:rgba(255,71,87,.1);  color:#ff4757; border:1px solid rgba(255,71,87,.2) }
+
+  /* RODAPÉ */
+  .rodape {
+    text-align:center; margin-top:20px;
+    font-size:11px; color:#2a3450; line-height:1.8;
+  }
+  .rodape a { color:#3a4560; cursor:pointer; text-decoration:none }
+  .rodape a:hover { color:#00d4ff }
+
+  /* ÍCONE LOCK */
+  .lock-icon {
+    width:48px; height:48px; border-radius:12px;
+    background:rgba(0,212,255,.08); border:1px solid rgba(0,212,255,.2);
+    display:flex; align-items:center; justify-content:center;
+    font-size:24px; margin:0 auto 14px;
+  }
+
+  /* SUCESSO */
+  .sucesso-box { text-align:center; padding:24px 0 8px; display:none }
+  .sucesso-ico { font-size:56px; margin-bottom:14px; animation:popIn .4s ease }
+  @keyframes popIn { from{transform:scale(.5);opacity:0} to{transform:scale(1);opacity:1} }
+  .sucesso-titulo { font-size:20px; font-weight:900; color:#00e5a0; margin-bottom:6px }
+  .sucesso-sub    { font-size:13px; color:#7a8aaa; margin-bottom:20px }
+  .btn-entrar {
+    width:100%; padding:14px; border:none; border-radius:12px;
+    background:linear-gradient(135deg,#00e5a0,#00c880);
+    color:#000; font-size:15px; font-weight:800;
+    cursor:pointer; font-family:inherit; transition:all .2s;
+    box-shadow:0 4px 20px rgba(0,229,160,.35);
+  }
+  .btn-entrar:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(0,229,160,.5) }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<div class="container">
+
+  <div class="logo-area">
+    <div class="logo-img"><img src="../logo.png" alt="RecoverX"></div>
+    <div class="logo-nome"><span>Recover</span>X</div>
+    <div class="logo-sub">GHZ Plugin • Software de Recuperação de Arquivos</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="lock-icon">🔑</div>
+      <div class="card-titulo">Ativação do Software</div>
+      <div class="card-sub">Insira sua chave de licença para continuar</div>
+    </div>
+    <div class="card-body">
+
+      <!-- FORMULÁRIO -->
+      <div id="formBox">
+        <div class="input-wrap">
+          <input
+            type="text"
+            id="inputChave"
+            class="input-chave"
+            placeholder="REXV-XXXX-XXXX-XXXX"
+            maxlength="19"
+            oninput="formatarChave(this)"
+            onkeydown="if(event.key==='Enter') ativar()"
+          >
+        </div>
+
+        <button class="btn-ativar" id="btnAtivar" onclick="ativar()">
+          🔓 Ativar RecoverX
+        </button>
+
+        <div class="feedback" id="feedback"></div>
+      </div>
+
+      <!-- SUCESSO -->
+      <div class="sucesso-box" id="sucessoBox">
+        <div class="sucesso-ico">✅</div>
+        <div class="sucesso-titulo">Licença Ativada!</div>
+        <div class="sucesso-sub">Bem-vindo ao RecoverX. Entrando...</div>
+        <button class="btn-entrar" onclick="entrar()">🚀 Entrar no RecoverX</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="rodape">
+    Precisa de ajuda? <a onclick="require('electron').shell.openExternal('https://wa.me/5511999999999')">Fale com o suporte</a><br>
+    GHZ Plugin © 2025 — Licença individual e intransferível
+  </div>
+
+</div>
+
+<script src="../js/licenca.js"></script>
+<script>
+function formatarChave(input) {
+  let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'')
+  let f = ''
+  for (let i = 0; i < v.length && i < 16; i++) {
+    if (i > 0 && i % 4 === 0) f += '-'
+    f += v[i]
+  }
+  input.value = f
+  input.classList.remove('ok','erro')
+  document.getElementById('feedback').style.display = 'none'
+}
+
+function mostrarFeedback(tipo, msg) {
+  const el = document.getElementById('feedback')
+  el.className = 'feedback ' + tipo
+  el.textContent = msg
+  el.style.display = 'block'
+}
+
+function ativar() {
+  const chave = document.getElementById('inputChave').value.trim()
+  const input = document.getElementById('inputChave')
+  const btn   = document.getElementById('btnAtivar')
+
+  if (!chave) {
+    mostrarFeedback('err', '⚠️ Insira a chave de licença.')
+    input.classList.add('erro'); input.focus(); return
+  }
+
+  btn.disabled = true
+  btn.innerHTML = '⏳ Validando...'
+
+  setTimeout(() => {
+    if (validarChaveRX(chave)) {
+      salvarLicencaRX(chave)
+      input.classList.add('ok')
+      document.getElementById('formBox').style.display    = 'none'
+      document.getElementById('sucessoBox').style.display = 'block'
+    } else {
+      input.classList.add('erro')
+      mostrarFeedback('err', '❌ Chave inválida. Verifique e tente novamente.')
+      btn.disabled = false
+      btn.innerHTML = '🔓 Ativar RecoverX'
+      input.focus()
+    }
+  }, 800)
+}
+
+function entrar() {
+  window.location.replace('../index.html')
+}
+</script>
+</body>
+</html>
