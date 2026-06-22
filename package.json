@@ -1,6 +1,6 @@
 {
   "name": "recoverx",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "RecoverX - Recuperacao Profissional de Arquivos",
   "main": "main.js",
   "author": "GHZ Plugin",
@@ -11,11 +11,32 @@
   "build": {
     "appId": "com.ghzplugin.recoverx",
     "productName": "RecoverX",
-    "directories": { "output": "dist_installer" },
-    "files": ["**/*", "!dist_installer/**", "!node_modules/.cache/**"],
-    "extraResources": [{ "from": "tools/", "to": "tools/", "filter": ["**/*"] }],
+    "directories": {
+      "output": "dist_installer"
+    },
+    "files": [
+      "**/*",
+      "!dist_installer/**",
+      "!node_modules/.cache/**"
+    ],
+    "extraResources": [
+      {
+        "from": "tools/",
+        "to": "tools/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "logo.ico",
       "requestedExecutionLevel": "requireAdministrator"
     },
@@ -33,4 +54,3 @@
   },
   "dependencies": {}
 }
-
