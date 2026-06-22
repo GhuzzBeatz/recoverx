@@ -3,8 +3,12 @@ const path   = require('path')
 const fs     = require('fs')
 const os     = require('os')
 const { exec, spawn } = require('child_process')
+const createLocalLicenseGate = require('./js/local-license-gate')
 
 app.setName('RecoverX')
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) app.quit()
 
 function getDataDir() {
   return app.isPackaged
@@ -165,6 +169,17 @@ function filtrosWinFRPorTipos(tipos = []) {
 }
 
 let win = null, splash = null
+const licenseGate = createLocalLicenseGate({
+  storageKey: '@RECOVERX:licenca', prefix: 'REXV', salt: 'GHZ2026RECOVERX', multiplier: 53, min: 1, max: 9999
+})
+
+app.on('second-instance', () => {
+  const target = win || splash
+  if (!target) return
+  if (target.isMinimized()) target.restore()
+  target.show()
+  target.focus()
+})
 
 function createSplash() {
   splash = new BrowserWindow({
@@ -191,6 +206,7 @@ function createWindow() {
       contextIsolation: false,
       webSecurity: false,
       backgroundThrottling: false,
+      devTools: !app.isPackaged,
       additionalArguments: ['--data-dir=' + getDataDir(), '--tools-dir=' + getToolsDir()]
     }
   }
@@ -209,7 +225,7 @@ function createWindow() {
   const dir = getDataDir()
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
 
-  win.loadFile('index.html')
+  licenseGate.attach(win)
 
   win.once('ready-to-show', () => {
     // Aguarda 2s mínimo no splash para não piscar
@@ -637,5 +653,13 @@ function criarPastaScanProfundo(destinoBase) {
   return path.join(destinoBase, nome)
 }
 
-app.whenReady().then(() => { createSplash(); setTimeout(createWindow, 300) })
+app.whenReady().then(() => {
+  if (!gotSingleInstanceLock) return
+  createSplash()
+  setTimeout(async () => {
+    createWindow()
+    await win.loadFile('pages/licenca.html')
+    if (await licenseGate.authorizeFromStorage(win)) await win.loadFile('index.html')
+  }, 300)
+})
 app.on('window-all-closed', () => { if (process.platform!=='darwin') app.quit() })
